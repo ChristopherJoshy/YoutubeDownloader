@@ -2,10 +2,10 @@ import streamlit as st
 import os
 import threading
 import time
-from pathlib import Path
-import base64
 import datetime
 import random
+from pathlib import Path
+import base64
 from downloader import YouTubeDownloader
 from utils import validate_youtube_url, format_duration, get_file_size
 
@@ -34,6 +34,12 @@ if 'current_downloader' not in st.session_state:
     st.session_state.current_downloader = None
 if 'file_downloaded' not in st.session_state:
     st.session_state.file_downloaded = False
+if 'error_message' not in st.session_state:
+    st.session_state.error_message = None
+if 'fallback_used' not in st.session_state:
+    st.session_state.fallback_used = None
+if 'extraction_attempts' not in st.session_state:
+    st.session_state.extraction_attempts = 0
 
 # Load custom CSS and JavaScript
 def load_hacker_css():
@@ -74,7 +80,12 @@ def add_random_log():
         "Port scan initiated on target...",
         "Brute force attack commenced...",
         "Social engineering phase complete...",
-        "Zero-day exploit activated..."
+        "Zero-day exploit activated...",
+        "Rotating user agents...",
+        "Proxying connection through nodes...",
+        "Bypassing content filters...",
+        "Implementing evasion techniques...",
+        "Randomizing request patterns..."
     ]
     
     if len(st.session_state.terminal_logs) > 15:
@@ -127,19 +138,28 @@ if st.button("execute", key="fetch_info"):
             add_random_log()
             st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Initiating target acquisition...")
             st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Scanning URL: {url[:50]}...")
+            st.session_state.error_message = None
+            st.session_state.extraction_attempts = 0
             
             with st.spinner("processing..."):
                 downloader = YouTubeDownloader()
+                st.session_state.current_downloader = downloader
                 try:
+                    st.session_state.extraction_attempts += 1
                     video_info = downloader.get_video_info(url)
                     if video_info:
                         st.session_state.video_info = video_info
+                        st.session_state.fallback_used = video_info.get('fallback_used', None)
+                        if st.session_state.fallback_used:
+                            st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Using extraction method: {st.session_state.fallback_used}")
                         st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Target acquired - Video metadata extracted")
                         st.rerun()
                     else:
-                        st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Extraction failed - Target inaccessible")
+                        st.session_state.error_message = downloader.get_last_error() or "Unknown extraction error"
+                        st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Extraction failed - {st.session_state.error_message}")
                         st.rerun()
                 except Exception as e:
+                    st.session_state.error_message = str(e)
                     st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Error: {str(e)}")
                     st.rerun()
         else:
@@ -147,6 +167,42 @@ if st.button("execute", key="fetch_info"):
             st.rerun()
     else:
         st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] No input provided")
+
+# Display error message if present
+if st.session_state.error_message:
+    st.markdown(f"""
+    <div style="background: #330000; color: #ff0000; font-family: 'Fira Code', monospace; padding: 0.5rem; border: 1px solid #ff0000; margin: 0.5rem 0;">
+        <span style="color: #ff0000;">ERROR:</span> {st.session_state.error_message}
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Provide retry option if extraction failed
+    if st.session_state.extraction_attempts < 3:
+        if st.button("retry_with_fallback", key="retry_btn"):
+            st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Retrying with alternative extraction methods...")
+            st.session_state.extraction_attempts += 1
+            
+            with st.spinner("processing_fallbacks..."):
+                downloader = YouTubeDownloader()
+                st.session_state.current_downloader = downloader
+                try:
+                    video_info = downloader.get_video_info(url)
+                    if video_info:
+                        st.session_state.video_info = video_info
+                        st.session_state.fallback_used = video_info.get('fallback_used', None)
+                        if st.session_state.fallback_used:
+                            st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Using extraction method: {st.session_state.fallback_used}")
+                        st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Target acquired - Video metadata extracted")
+                        st.session_state.error_message = None
+                        st.rerun()
+                    else:
+                        st.session_state.error_message = downloader.get_last_error() or "Unknown extraction error"
+                        st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Fallback extraction failed - {st.session_state.error_message}")
+                        st.rerun()
+                except Exception as e:
+                    st.session_state.error_message = str(e)
+                    st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Fallback error: {str(e)}")
+                    st.rerun()
 
 # Display video information if available
 if st.session_state.video_info:
@@ -158,6 +214,11 @@ if st.session_state.video_info:
     st.markdown(f'<div class="command-line" style="margin: 0.1rem 0;">source_channel: {video_info.get("uploader", "unknown")}</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="command-line" style="margin: 0.1rem 0;">duration: {format_duration(video_info.get("duration", 0))}</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="command-line" style="margin: 0.1rem 0;">view_count: {video_info.get("view_count", "unknown"):,}</div>', unsafe_allow_html=True)
+    
+    # Show which extraction method was used
+    if st.session_state.fallback_used:
+        st.markdown(f'<div class="command-line" style="margin: 0.1rem 0; color: #ffcc00;">extraction_method: {st.session_state.fallback_used}</div>', unsafe_allow_html=True)
+    
     st.markdown('<div class="command-line" style="margin: 0.1rem 0;">status: ready_for_extraction</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
@@ -204,6 +265,8 @@ if st.session_state.video_info:
             st.session_state.downloading = True
             st.session_state.download_progress = 0
             st.session_state.download_status = "initializing..."
+            st.session_state.error_message = None
+            st.session_state.fallback_used = None
             st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Starting extraction protocol...")
             st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Format: {format_option} | Quality: {quality_option}")
             
@@ -237,18 +300,26 @@ if st.session_state.video_info:
                     if success:
                         st.session_state.download_status = "extraction_complete"
                         st.session_state.download_progress = 100
+                        st.session_state.fallback_used = downloader.get_fallback_used()
+                        
                         if hasattr(st.session_state, 'terminal_logs'):
+                            if st.session_state.fallback_used:
+                                st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Successful extraction using: {st.session_state.fallback_used}")
                             st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] File secured in downloads directory")
                             st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] File ready for download")
                     else:
                         st.session_state.download_status = "extraction_failed"
                         st.session_state.download_progress = 0
+                        st.session_state.error_message = downloader.get_last_error() or "Unknown download error"
+                        
                         if hasattr(st.session_state, 'terminal_logs'):
-                            st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Extraction failed - protocol error")
+                            st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Extraction failed - {st.session_state.error_message}")
                     
                 except Exception as e:
                     st.session_state.download_status = f"error: {str(e)}"
                     st.session_state.download_progress = 0
+                    st.session_state.error_message = str(e)
+                    
                     if hasattr(st.session_state, 'terminal_logs'):
                         st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] System error: {str(e)}")
                 
@@ -273,6 +344,10 @@ if st.session_state.video_info:
         progress_bar = "█" * int(st.session_state.download_progress // 5) + "░" * (20 - int(st.session_state.download_progress // 5))
         st.markdown(f'<div class="command-line">status: {st.session_state.download_status}</div>', unsafe_allow_html=True)
         st.markdown(f'<div class="command-line">progress: [{progress_bar}] {st.session_state.download_progress:.1f}%</div>', unsafe_allow_html=True)
+        
+        if st.session_state.fallback_used:
+            st.markdown(f'<div class="command-line">using: {st.session_state.fallback_used}</div>', unsafe_allow_html=True)
+            
         st.markdown('</div>', unsafe_allow_html=True)
         
         # Auto-refresh while downloading
@@ -293,6 +368,10 @@ if st.session_state.video_info:
                     st.markdown(f'<div class="command-line">file_saved: {latest_file.name}</div>', unsafe_allow_html=True)
                     st.markdown(f'<div class="command-line">file_size: {file_size}</div>', unsafe_allow_html=True)
                     st.markdown(f'<div class="command-line">location: ./downloads/{latest_file.name}</div>', unsafe_allow_html=True)
+                    
+                    if st.session_state.fallback_used:
+                        st.markdown(f'<div class="command-line">extraction_method: {st.session_state.fallback_used}</div>', unsafe_allow_html=True)
+                        
                     st.markdown('<div class="command-line" style="color: #ffcc00;">warning: file will be deleted after download</div>', unsafe_allow_html=True)
                     
                     # Provide download button
@@ -323,6 +402,28 @@ if st.session_state.video_info:
                                 st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Error during cleanup: {str(e)}")
                     
                     st.markdown('</div>', unsafe_allow_html=True)
+                    
+    # Display error message if download failed
+    if st.session_state.error_message and not st.session_state.downloading and st.session_state.download_progress == 0:
+        st.markdown(f"""
+        <div style="background: #330000; color: #ff0000; font-family: 'Fira Code', monospace; padding: 0.5rem; border: 1px solid #ff0000; margin: 0.5rem 0;">
+            <span style="color: #ff0000;">DOWNLOAD ERROR:</span> {st.session_state.error_message}
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Provide retry option
+        if st.button("retry_extraction", key="retry_download_btn"):
+            st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Retrying download with alternate methods...")
+            st.session_state.downloading = True
+            st.session_state.download_progress = 0
+            st.session_state.download_status = "initializing..."
+            st.session_state.error_message = None
+            
+            # Start retry thread
+            download_thread = threading.Thread(target=download_video)
+            download_thread.daemon = True
+            download_thread.start()
+            st.rerun()
 
 # Keep adding random logs to simulate activity
 if st.session_state.log_counter % 5 == 0:
@@ -332,3 +433,10 @@ if st.session_state.log_counter % 5 == 0:
 if len(st.session_state.terminal_logs) > 0 and st.session_state.log_counter % 10 == 0:
     time.sleep(0.5)
     st.rerun()
+
+# Add footer with version and fallback information
+st.markdown("""
+<div style="position: fixed; bottom: 0; left: 0; width: 100%; background-color: #000; border-top: 1px solid #00ff41; padding: 5px 10px; font-family: 'Fira Code', monospace; font-size: 12px; color: #00aa33;">
+    <span>Terminal YouTube Extractor v0.1.1 | Multiple Extraction Methods | Auto-Cleanup</span>
+</div>
+""", unsafe_allow_html=True)
