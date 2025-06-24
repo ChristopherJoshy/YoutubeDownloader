@@ -1,50 +1,64 @@
 import yt_dlp
 import os
+import random
 from pathlib import Path
 import threading
 import time
-import tempfile
 
 class YouTubeDownloader:
     def __init__(self):
         self.download_dir = Path("downloads")
         self.download_dir.mkdir(exist_ok=True)
         self.last_downloaded_file = None
-        self.cookies_file = None
+        self.user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Edge/124.0.0.0'
+        ]
         
-    def set_cookies(self, cookies_data=None, browser_name=None):
-        """Set cookies from either uploaded data or browser name"""
-        if cookies_data:
-            # Create a temporary file to store the cookies
-            temp_cookie_file = tempfile.NamedTemporaryFile(delete=False, suffix='.txt')
-            temp_cookie_file.write(cookies_data)
-            temp_cookie_file.close()
-            self.cookies_file = temp_cookie_file.name
-            return True
-        elif browser_name:
-            # Use cookies from a browser
-            self.cookies_file = f"--cookies-from-browser={browser_name}"
-            return True
-        return False
+    def _get_base_options(self):
+        """Get base options with anti-bot detection measures"""
+        # Select a random user agent
+        user_agent = random.choice(self.user_agents)
+        
+        return {
+            'quiet': True,
+            'no_warnings': True,
+            'nocheckcertificate': True,
+            'ignoreerrors': True,
+            'no_color': True,
+            'geo_bypass': True,
+            'extractor_retries': 3,
+            'socket_timeout': 20,
+            'http_headers': {
+                'User-Agent': user_agent,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Referer': 'https://www.youtube.com/',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'same-origin',
+                'Sec-Fetch-User': '?1',
+                'TE': 'trailers'
+            }
+        }
         
     def get_video_info(self, url):
         """Extract video information without downloading"""
-        ydl_opts = {
-            'quiet': True,
-            'no_warnings': True,
-        }
-        
-        # Add cookies if available
-        if self.cookies_file:
-            if self.cookies_file.startswith('--cookies-from-browser='):
-                browser = self.cookies_file.replace('--cookies-from-browser=', '')
-                ydl_opts['cookiesfrombrowser'] = (browser, None, None, None)
-            else:
-                ydl_opts['cookiefile'] = self.cookies_file
+        ydl_opts = self._get_base_options()
         
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
+                
+                if not info:
+                    return None
                 
                 return {
                     'title': info.get('title', 'Unknown Title'),
@@ -70,23 +84,19 @@ class YouTubeDownloader:
         # Configure output template
         output_template = str(self.download_dir / '%(title)s.%(ext)s')
         
-        # Base options
-        ydl_opts = {
-            'outtmpl': output_template,
-            'quiet': True,
-            'no_warnings': True,
-            'noplaylist': True,  # Single video, not playlist
-            'geo_bypass': True,  # Try to bypass geo-restrictions
-            'geo_bypass_country': 'US',  # Use US as default
-        }
+        # Base options with anti-bot detection
+        ydl_opts = self._get_base_options()
+        ydl_opts['outtmpl'] = output_template
         
-        # Add cookies if available
-        if self.cookies_file:
-            if self.cookies_file.startswith('--cookies-from-browser='):
-                browser = self.cookies_file.replace('--cookies-from-browser=', '')
-                ydl_opts['cookiesfrombrowser'] = (browser, None, None, None)
-            else:
-                ydl_opts['cookiefile'] = self.cookies_file
+        # Add additional options to bypass restrictions
+        ydl_opts.update({
+            'skip_download': False,
+            'retries': 10,
+            'fragment_retries': 10,
+            'file_access_retries': 10,
+            'retry_sleep_functions': {'fragment': lambda n: 5 * (n + 1)},
+            'max_sleep_interval': 30
+        })
         
         # Format-specific options
         if format_type == 'mp3':
@@ -119,24 +129,25 @@ class YouTubeDownloader:
             # Get file metadata before download to predict filename
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info_dict = ydl.extract_info(url, download=False)
-                # Get the title and extension
-                title = info_dict.get('title', 'video')
-                if format_type == 'mp3':
-                    ext = 'mp3'
-                else:
-                    ext = info_dict.get('ext', format_type)
-                
-                # Sanitize the filename (similar to what yt-dlp does)
-                from utils import sanitize_filename
-                clean_title = sanitize_filename(title)
-                self.last_downloaded_file = self.download_dir / f"{clean_title}.{ext}"
+                if info_dict:
+                    # Get the title and extension
+                    title = info_dict.get('title', 'video')
+                    if format_type == 'mp3':
+                        ext = 'mp3'
+                    else:
+                        ext = info_dict.get('ext', format_type)
+                    
+                    # Sanitize the filename (similar to what yt-dlp does)
+                    from utils import sanitize_filename
+                    clean_title = sanitize_filename(title)
+                    self.last_downloaded_file = self.download_dir / f"{clean_title}.{ext}"
                 
             # Now do the actual download
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
                 
             # Verify file exists and find it if the filename is different
-            if not self.last_downloaded_file.exists():
+            if self.last_downloaded_file and not self.last_downloaded_file.exists():
                 # Try to find the most recently created file
                 files = list(self.download_dir.glob("*"))
                 if files:
@@ -168,15 +179,6 @@ class YouTubeDownloader:
                 print(f"Error deleting file: {str(e)}")
                 return False
         return False
-    
-    def cleanup(self):
-        """Clean up any temporary files"""
-        if self.cookies_file and os.path.exists(self.cookies_file) and not self.cookies_file.startswith('--cookies-from-browser='):
-            try:
-                os.remove(self.cookies_file)
-                self.cookies_file = None
-            except:
-                pass
     
     def _get_audio_quality(self, quality):
         """Convert quality string to audio bitrate"""
@@ -215,8 +217,12 @@ class YouTubeDownloader:
     def get_available_formats(self, url):
         """Get all available formats for a video"""
         try:
-            with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+            ydl_opts = self._get_base_options()
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
+                if not info:
+                    return {'video_formats': [], 'audio_formats': []}
+                    
                 formats = info.get('formats', [])
                 
                 # Filter and organize formats
@@ -254,11 +260,17 @@ class YouTubeDownloader:
         """Download entire playlist"""
         output_template = str(self.download_dir / '%(playlist_title)s/%(title)s.%(ext)s')
         
-        ydl_opts = {
-            'outtmpl': output_template,
-            'quiet': True,
-            'no_warnings': True,
-        }
+        # Get base options with anti-bot measures
+        ydl_opts = self._get_base_options()
+        ydl_opts['outtmpl'] = output_template
+        
+        # Add additional options to bypass restrictions
+        ydl_opts.update({
+            'skip_download': False,
+            'retries': 10,
+            'fragment_retries': 10,
+            'file_access_retries': 10
+        })
         
         # Configure format same as single video
         if format_type == 'mp3':
@@ -287,7 +299,3 @@ class YouTubeDownloader:
         except Exception as e:
             print(f"Playlist download error: {str(e)}")
             return False
-
-    def __del__(self):
-        """Destructor to clean up resources"""
-        self.cleanup()

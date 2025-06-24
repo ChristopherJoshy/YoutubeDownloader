@@ -49,6 +49,7 @@
 - 🚀 **Async Processing**: Non-blocking download experience
 - 🎨 **Hacker Terminal UI**: Custom Matrix-inspired interface
 - 🗑️ **Auto-Deletion**: Files are removed after user download
+- 🤖 **Anti-Bot Bypass**: Works in cloud environments without cookies
 </div>
 </div>
 
@@ -68,8 +69,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/youtube-downloader.git
-cd youtube-downloader
+git clone https://github.com/ChristopherJoshy/YoutubeDownloader.git
+cd YoutubeDownloader
 
 # Install dependencies
 pip install -r dependencies.txt
@@ -151,6 +152,7 @@ graph TD
     H --> I[URL Validation]
     H --> J[File Operations]
     B --> K[Automatic File Deletion]
+    B --> L[Anti-Bot Detection]
 ```
 
 ### 🔧 Key Classes
@@ -158,6 +160,16 @@ graph TD
 - **YouTubeDownloader**: Core functionality for video/audio downloading and automatic cleanup
 - **Utils**: Helper functions for validation, formatting, and file operations
 - **Streamlit App**: Web interface with terminal aesthetics
+
+### 🔄 Anti-Bot Detection Features
+
+The application includes several techniques to bypass YouTube's bot detection when hosted on cloud platforms:
+
+- **Browser Fingerprinting**: Mimics legitimate browser requests
+- **Rotating User Agents**: Uses different browser signatures for each request
+- **HTTP Headers**: Includes all standard browser headers
+- **Retry Logic**: Implements intelligent retry mechanisms
+- **Error Handling**: Gracefully handles rate limiting and captcha challenges
 
 ---
 
@@ -183,6 +195,7 @@ youtube-downloader/
 ## 🔄 Development Roadmap
 
 - [x] Add automatic file deletion after download
+- [x] Add anti-bot detection bypass for cloud hosting
 - [ ] Add dark/light theme toggle
 - [ ] Implement batch URL processing
 - [ ] Add custom download location option
