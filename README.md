@@ -203,7 +203,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
     <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExczFsbXRtY202dWtseGZkZGZsbTdxNHNzOHY5MWxnZ2t0cTlhODJtMSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3oKIPnAiaMCws8nOsE/giphy.gif" width="200"/>
   </p>
   <p>
-    <i>Built with ❤️ and ☕ by <a href="https://github.com/yourusername">Your Name</a></i>
+    <i>Built with ❤️ and ☕ by <a href="https://github.com/christopherjoshy">Christopher Joshy</a></i>
   </p>
   <p>
     <i>Star this repository if you found it useful!</i>
