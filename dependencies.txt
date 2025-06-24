@@ -1,0 +1,9 @@
+# Dependencies for Terminal YouTube Extractor
+# Install these manually using: pip install <package-name>
+
+streamlit>=1.46.0
+yt-dlp>=2025.6.9
+
+# System requirements:
+# - FFmpeg (install via package manager)
+# - Write permissions for downloads directory
