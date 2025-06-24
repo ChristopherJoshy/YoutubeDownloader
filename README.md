@@ -48,7 +48,7 @@
 - 📂 **Auto Directory Creation**: Organized file storage
 - 🚀 **Async Processing**: Non-blocking download experience
 - 🎨 **Hacker Terminal UI**: Custom Matrix-inspired interface
-- 💾 **Auto Cleanup**: Optional old download removal
+- 🗑️ **Auto-Deletion**: Files are removed after user download
 </div>
 </div>
 
@@ -110,7 +110,7 @@ streamlit run app.py
 3. **Select Format**: Choose between MP4, MP3, or WebM
 4. **Select Quality**: Pick your preferred resolution/bitrate
 5. **Download**: Click "extract" to download the video/audio
-6. **Find Files**: Check the "downloads" directory for your media
+6. **Get Your File**: Download the file to your device (it will be automatically deleted from the server after download)
 
 <div align="center">
   <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM29meXd0cWppYXZidzZpbjFiaDVuMHY0OGcwaDJkeGV3Nm10NmhtNSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l3vR85PnGsBwu1PFK/giphy.gif" width="60%"/>
@@ -150,11 +150,12 @@ graph TD
     A --> H[Utils]
     H --> I[URL Validation]
     H --> J[File Operations]
+    B --> K[Automatic File Deletion]
 ```
 
 ### 🔧 Key Classes
 
-- **YouTubeDownloader**: Core functionality for video/audio downloading
+- **YouTubeDownloader**: Core functionality for video/audio downloading and automatic cleanup
 - **Utils**: Helper functions for validation, formatting, and file operations
 - **Streamlit App**: Web interface with terminal aesthetics
 
@@ -169,7 +170,7 @@ youtube-downloader/
 ├── utils.py               # Helper utilities
 ├── dependencies.txt       # Project dependencies
 ├── pyproject.toml         # Project configuration
-├── downloads/             # Downloaded files directory
+├── downloads/             # Downloaded files directory (temporary storage)
 └── static/                # UI assets
     ├── fire-animations.css # Fire animation styles
     ├── hacker-terminal.css # Terminal styling
@@ -181,6 +182,7 @@ youtube-downloader/
 
 ## 🔄 Development Roadmap
 
+- [x] Add automatic file deletion after download
 - [ ] Add dark/light theme toggle
 - [ ] Implement batch URL processing
 - [ ] Add custom download location option

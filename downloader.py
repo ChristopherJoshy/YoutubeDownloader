@@ -8,6 +8,7 @@ class YouTubeDownloader:
     def __init__(self):
         self.download_dir = Path("downloads")
         self.download_dir.mkdir(exist_ok=True)
+        self.last_downloaded_file = None
         
     def get_video_info(self, url):
         """Extract video information without downloading"""
@@ -79,12 +80,58 @@ class YouTubeDownloader:
             ydl_opts['progress_hooks'] = [self._progress_hook(progress_callback)]
         
         try:
+            # Get file metadata before download to predict filename
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info_dict = ydl.extract_info(url, download=False)
+                # Get the title and extension
+                title = info_dict.get('title', 'video')
+                if format_type == 'mp3':
+                    ext = 'mp3'
+                else:
+                    ext = info_dict.get('ext', format_type)
+                
+                # Sanitize the filename (similar to what yt-dlp does)
+                from utils import sanitize_filename
+                clean_title = sanitize_filename(title)
+                self.last_downloaded_file = self.download_dir / f"{clean_title}.{ext}"
+                
+            # Now do the actual download
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
+                
+            # Verify file exists and find it if the filename is different
+            if not self.last_downloaded_file.exists():
+                # Try to find the most recently created file
+                files = list(self.download_dir.glob("*"))
+                if files:
+                    self.last_downloaded_file = max(files, key=lambda x: x.stat().st_mtime)
+                
             return True
         except Exception as e:
             print(f"Download error: {str(e)}")
+            self.last_downloaded_file = None
             return False
+    
+    def get_last_downloaded_file(self):
+        """Return the path to the last downloaded file"""
+        return self.last_downloaded_file
+    
+    def delete_file(self, file_path=None):
+        """Delete a file from the downloads directory"""
+        if file_path is None and self.last_downloaded_file:
+            file_path = self.last_downloaded_file
+            
+        if file_path and os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                print(f"Deleted file: {file_path}")
+                if file_path == self.last_downloaded_file:
+                    self.last_downloaded_file = None
+                return True
+            except Exception as e:
+                print(f"Error deleting file: {str(e)}")
+                return False
+        return False
     
     def _get_audio_quality(self, quality):
         """Convert quality string to audio bitrate"""

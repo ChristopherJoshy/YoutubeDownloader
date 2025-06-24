@@ -4,6 +4,8 @@ import threading
 import time
 from pathlib import Path
 import base64
+import datetime
+import random
 from downloader import YouTubeDownloader
 from utils import validate_youtube_url, format_duration, get_file_size
 
@@ -28,6 +30,10 @@ if 'terminal_logs' not in st.session_state:
     st.session_state.terminal_logs = []
 if 'log_counter' not in st.session_state:
     st.session_state.log_counter = 0
+if 'current_downloader' not in st.session_state:
+    st.session_state.current_downloader = None
+if 'file_downloaded' not in st.session_state:
+    st.session_state.file_downloaded = False
 
 # Load custom CSS and JavaScript
 def load_hacker_css():
@@ -47,9 +53,6 @@ load_hacker_css()
 load_matrix_js()
 
 # Generate random terminal logs
-import random
-import datetime
-
 def add_random_log():
     logs = [
         "Scanning network interfaces...",
@@ -207,6 +210,7 @@ if st.session_state.video_info:
             # Start download in background thread
             def download_video():
                 downloader = YouTubeDownloader()
+                st.session_state.current_downloader = downloader
                 try:
                     # Convert format names
                     format_map = {"mp4": "mp4", "mp3": "mp3", "webm": "webm"}
@@ -289,15 +293,35 @@ if st.session_state.video_info:
                     st.markdown(f'<div class="command-line">file_saved: {latest_file.name}</div>', unsafe_allow_html=True)
                     st.markdown(f'<div class="command-line">file_size: {file_size}</div>', unsafe_allow_html=True)
                     st.markdown(f'<div class="command-line">location: ./downloads/{latest_file.name}</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="command-line" style="color: #ffcc00;">warning: file will be deleted after download</div>', unsafe_allow_html=True)
                     
                     # Provide download button
                     with open(latest_file, "rb") as file:
-                        btn = st.download_button(
-                            label="download_file",
-                            data=file,
-                            file_name=latest_file.name,
-                            mime="application/octet-stream"
-                        )
+                        file_data = file.read()
+                    
+                    if st.download_button(
+                        label="download_file",
+                        data=file_data,
+                        file_name=latest_file.name,
+                        mime="application/octet-stream",
+                        key="download_file_btn"
+                    ):
+                        # This code runs after the download button is clicked
+                        st.session_state.file_downloaded = True
+                        st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] File downloaded - executing cleanup...")
+                        
+                        # Delete the file
+                        if st.session_state.current_downloader:
+                            st.session_state.current_downloader.delete_file()
+                            st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] File {latest_file.name} deleted from server")
+                        else:
+                            # Fallback if downloader instance is not available
+                            try:
+                                os.remove(latest_file)
+                                st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] File {latest_file.name} deleted from server")
+                            except Exception as e:
+                                st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Error during cleanup: {str(e)}")
+                    
                     st.markdown('</div>', unsafe_allow_html=True)
 
 # Keep adding random logs to simulate activity
