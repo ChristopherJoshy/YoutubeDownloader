@@ -14,7 +14,7 @@ st.set_page_config(
     page_title="Terminal",
     page_icon="⬛",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"  # Changed to expanded to show cookie options
 )
 
 # Initialize session state
@@ -34,6 +34,8 @@ if 'current_downloader' not in st.session_state:
     st.session_state.current_downloader = None
 if 'file_downloaded' not in st.session_state:
     st.session_state.file_downloaded = False
+if 'cookies_set' not in st.session_state:
+    st.session_state.cookies_set = False
 
 # Load custom CSS and JavaScript
 def load_hacker_css():
@@ -44,13 +46,62 @@ def load_hacker_css():
 def load_matrix_js():
     with open('static/matrix-rain.js', 'r') as f:
         js = f.read()
-    st.components.v1.html(f"""
-        <script>{js}</script>
-    """, height=0)
+    components_html = f"""<script>{js}</script>"""
+    st.markdown(components_html, unsafe_allow_html=True)
 
 # Load hacker terminal styling
 load_hacker_css()
 load_matrix_js()
+
+# Sidebar for cookies and advanced options
+with st.sidebar:
+    st.markdown("""
+    <div style="background: #000000; color: #00ff41; font-family: 'Fira Code', monospace; padding: 0.5rem; border: 1px solid #00ff41;">
+        <span style="color: #00aa33;">root@system:~$</span> Authentication Tools
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown('<div style="margin-top: 1rem;"></div>', unsafe_allow_html=True)
+    
+    if st.session_state.cookies_set:
+        st.success("YouTube authentication cookies loaded")
+    else:
+        st.warning("YouTube might require authentication when hosted on cloud platforms. If you're having trouble downloading videos, please upload your cookies file.")
+    
+    with st.expander("➡️ Upload YouTube Cookies", expanded=not st.session_state.cookies_set):
+        st.markdown("""
+        <div style="font-size: 0.8rem; color: #aaaaaa;">
+        To bypass YouTube's bot detection when running on cloud platforms, you need to provide cookies from a logged-in YouTube session.
+        <br><br>
+        <strong>How to get cookies:</strong>
+        <ol>
+            <li>Install a browser extension like "Get cookies.txt" or "EditThisCookie" in Chrome/Firefox</li>
+            <li>Go to YouTube and ensure you're logged in</li>
+            <li>Use the extension to export cookies as a .txt file</li>
+            <li>Upload that file here</li>
+        </ol>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        uploaded_file = st.file_uploader("Upload cookies.txt file", type=['txt'], key="cookie_uploader")
+        
+        if uploaded_file is not None:
+            try:
+                # Initialize downloader if not already done
+                if not st.session_state.current_downloader:
+                    st.session_state.current_downloader = YouTubeDownloader()
+                
+                # Read and set cookies
+                cookie_bytes = uploaded_file.getvalue()
+                if st.session_state.current_downloader.set_cookies(cookies_data=cookie_bytes):
+                    st.session_state.cookies_set = True
+                    st.success("Cookies loaded successfully!")
+                    st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] YouTube authentication cookies loaded successfully")
+                    st.rerun()
+                else:
+                    st.error("Failed to load cookies")
+            except Exception as e:
+                st.error(f"Error processing cookies: {str(e)}")
 
 # Generate random terminal logs
 def add_random_log():
@@ -209,8 +260,13 @@ if st.session_state.video_info:
             
             # Start download in background thread
             def download_video():
-                downloader = YouTubeDownloader()
-                st.session_state.current_downloader = downloader
+                # Use existing downloader if available (for cookies)
+                if st.session_state.current_downloader:
+                    downloader = st.session_state.current_downloader
+                else:
+                    downloader = YouTubeDownloader()
+                    st.session_state.current_downloader = downloader
+                
                 try:
                     # Convert format names
                     format_map = {"mp4": "mp4", "mp3": "mp3", "webm": "webm"}
@@ -225,6 +281,9 @@ if st.session_state.video_info:
                     
                     if hasattr(st.session_state, 'terminal_logs'):
                         st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Injecting payload...")
+                        
+                        if not st.session_state.cookies_set:
+                            st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Warning: No authentication cookies set - YouTube may block the request")
                     
                     # Download the video
                     success = downloader.download_video(
@@ -245,12 +304,18 @@ if st.session_state.video_info:
                         st.session_state.download_progress = 0
                         if hasattr(st.session_state, 'terminal_logs'):
                             st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Extraction failed - protocol error")
+                            
+                            if not st.session_state.cookies_set:
+                                st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] YouTube may be blocking the request - try uploading cookies from the sidebar")
                     
                 except Exception as e:
                     st.session_state.download_status = f"error: {str(e)}"
                     st.session_state.download_progress = 0
                     if hasattr(st.session_state, 'terminal_logs'):
                         st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] System error: {str(e)}")
+                        
+                        if "429" in str(e) or "bot" in str(e).lower() or "cookies" in str(e).lower():
+                            st.session_state.terminal_logs.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] YouTube is detecting bot activity - try uploading cookies from the sidebar")
                 
                 st.session_state.downloading = False
             

@@ -3,12 +3,29 @@ import os
 from pathlib import Path
 import threading
 import time
+import tempfile
 
 class YouTubeDownloader:
     def __init__(self):
         self.download_dir = Path("downloads")
         self.download_dir.mkdir(exist_ok=True)
         self.last_downloaded_file = None
+        self.cookies_file = None
+        
+    def set_cookies(self, cookies_data=None, browser_name=None):
+        """Set cookies from either uploaded data or browser name"""
+        if cookies_data:
+            # Create a temporary file to store the cookies
+            temp_cookie_file = tempfile.NamedTemporaryFile(delete=False, suffix='.txt')
+            temp_cookie_file.write(cookies_data)
+            temp_cookie_file.close()
+            self.cookies_file = temp_cookie_file.name
+            return True
+        elif browser_name:
+            # Use cookies from a browser
+            self.cookies_file = f"--cookies-from-browser={browser_name}"
+            return True
+        return False
         
     def get_video_info(self, url):
         """Extract video information without downloading"""
@@ -16,6 +33,14 @@ class YouTubeDownloader:
             'quiet': True,
             'no_warnings': True,
         }
+        
+        # Add cookies if available
+        if self.cookies_file:
+            if self.cookies_file.startswith('--cookies-from-browser='):
+                browser = self.cookies_file.replace('--cookies-from-browser=', '')
+                ydl_opts['cookiesfrombrowser'] = (browser, None, None, None)
+            else:
+                ydl_opts['cookiefile'] = self.cookies_file
         
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -50,7 +75,18 @@ class YouTubeDownloader:
             'outtmpl': output_template,
             'quiet': True,
             'no_warnings': True,
+            'noplaylist': True,  # Single video, not playlist
+            'geo_bypass': True,  # Try to bypass geo-restrictions
+            'geo_bypass_country': 'US',  # Use US as default
         }
+        
+        # Add cookies if available
+        if self.cookies_file:
+            if self.cookies_file.startswith('--cookies-from-browser='):
+                browser = self.cookies_file.replace('--cookies-from-browser=', '')
+                ydl_opts['cookiesfrombrowser'] = (browser, None, None, None)
+            else:
+                ydl_opts['cookiefile'] = self.cookies_file
         
         # Format-specific options
         if format_type == 'mp3':
@@ -132,6 +168,15 @@ class YouTubeDownloader:
                 print(f"Error deleting file: {str(e)}")
                 return False
         return False
+    
+    def cleanup(self):
+        """Clean up any temporary files"""
+        if self.cookies_file and os.path.exists(self.cookies_file) and not self.cookies_file.startswith('--cookies-from-browser='):
+            try:
+                os.remove(self.cookies_file)
+                self.cookies_file = None
+            except:
+                pass
     
     def _get_audio_quality(self, quality):
         """Convert quality string to audio bitrate"""
@@ -242,3 +287,7 @@ class YouTubeDownloader:
         except Exception as e:
             print(f"Playlist download error: {str(e)}")
             return False
+
+    def __del__(self):
+        """Destructor to clean up resources"""
+        self.cleanup()
